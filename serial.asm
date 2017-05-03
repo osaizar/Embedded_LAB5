@@ -12,6 +12,7 @@ LSR_PORT	EQU	BASE_PORT+5
 RBR_PORT	EQU	BASE_PORT
 THR_PORT	EQU	BASE_PORT
 
+
 ; ---------------------------------------------------------------------
 ; void SerialPut(char ch)
 ; ---------------------------------------------------------------------
@@ -20,9 +21,25 @@ THR_PORT	EQU	BASE_PORT
 
 		GLOBAL	SerialPut
 
-SerialPut:	; <your code here>	; (1) Wait for THRE = 1
+SerialPut:
+		; <your code here>	; (1) Wait for THRE = 1
 		; <your code here>	; (2) Output character to UART
 		; <your code here>	; (3) Return to caller
+		PUSH EBP
+		MOV EBP, ESP
+
+		enable:
+		IN [THR_PORT], DX
+		BT DX, 5
+		JE enable
+
+		OUT [THR_PORT], 0x63 ; c
+		OUT [THR_PORT], 0x68 ; h
+
+		POP EBP
+
+		RET
+
 
 ; ---------------------------------------------------------------------
 ; void interrupt SerialISR(void)
@@ -34,16 +51,28 @@ SerialPut:	; <your code here>	; (1) Wait for THRE = 1
 		GLOBAL	SerialISR
 		EXTERN	QueueInsert	; (provided by LIBPC)
 
-SerialISR:	STI             	; Enable (higher-priority) IRQs 
+SerialISR:	STI             	; Enable (higher-priority) IRQs
 
-		; <your code here>	; (1) Preserve all registers 
+		; <your code here>	; (1) Preserve all registers
 		; <your code here>	; (2) Get character from UART
-		; <your code here>	; (3) Put character into queue 
+		; <your code here>	; (3) Put character into queue
 		; <your code here>	; Param #2: address of data
 		; <your code here>	; Param #1: address of queue
 
+		PUSH EBP
+		MOV EBP, ESP
+
+		; Perserve
+		MOV EDI, RBR_PORT ; get char
+
+		MOV [EBP+8], EDI ; write to queue
+
 		CALL	QueueInsert
 		ADD	ESP,8
+
+		POP EBP
+
+		RET
 
 _Eoi:		; <your code here>	; (4) Enable lower priority interrupts
 		; <your code here>	;       (Send Non-Specific EOI to PIC)
