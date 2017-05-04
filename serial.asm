@@ -22,20 +22,23 @@ THR_PORT	EQU	BASE_PORT
 		GLOBAL	SerialPut
 
 SerialPut:
-		; <your code here>	; (1) Wait for THRE = 1
-		; <your code here>	; (2) Output character to UART
-		; <your code here>	; (3) Return to caller
+
 		PUSH EBP
 		MOV EBP, ESP
 
+		; (1) Wait for THRE = 1
 		enable:
-		IN [THR_PORT], DX
-		BT DX, 5
+		MOV DX, LSR_PORT
+		IN AL, DX
+		BT AL, 5
 		JE enable
 
-		OUT [THR_PORT], 0x63 ; c
-		OUT [THR_PORT], 0x68 ; h
+		; (2) Output character to UART
+		MOV DX, THR_PORT
+		MOV AL, [ESP + 4]
+		OUT DX, AL
 
+		; (3) Return to caller
 		POP EBP
 
 		RET
@@ -53,19 +56,30 @@ SerialPut:
 
 SerialISR:	STI             	; Enable (higher-priority) IRQs
 
-		; <your code here>	; (1) Preserve all registers
-		; <your code here>	; (2) Get character from UART
-		; <your code here>	; (3) Put character into queue
-		; <your code here>	; Param #2: address of data
-		; <your code here>	; Param #1: address of queue
-
 		PUSH EBP
 		MOV EBP, ESP
+		; (1) Preserve all registers
+		PUSHA
 
-		; Perserve
-		MOV EDI, RBR_PORT ; get char
+		; look if RBF is 1
+		MOV DX, LSR_PORT
+		IN AL, DX
 
-		MOV [EBP+8], EDI ; write to queue
+		BT AL, 1
+		JE _Eoi
+
+		; (2) Get character from UART
+		MOV DX, RBR_PORT
+		IN AL, DX
+
+		; (3) Put character into queue
+		MOV [data], AL ; write to queue
+
+		; Param #2: address of data
+		PUSH data
+
+		; Param #1: address of queue
+		PUSH inbound_queue
 
 		CALL	QueueInsert
 		ADD	ESP,8
@@ -74,7 +88,12 @@ SerialISR:	STI             	; Enable (higher-priority) IRQs
 
 		RET
 
-_Eoi:		; <your code here>	; (4) Enable lower priority interrupts
+_Eoi:
+		; (4) Enable lower priority interrupts
+		MOV AL, 0x20
+		OUT 0x20, AL
 		; <your code here>	;       (Send Non-Specific EOI to PIC)
 		; <your code here>	; (5) Restore all registers
+		POPA
 		; <your code here>	; (6) Return to interrupted code
+		RET
