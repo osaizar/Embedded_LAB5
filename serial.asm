@@ -23,15 +23,11 @@ THR_PORT	EQU	BASE_PORT
 
 SerialPut:
 
-		PUSH EBP
-		MOV EBP, ESP
-
 		; (1) Wait for THRE = 1
-		enable:
 		MOV DX, LSR_PORT
 		IN AL, DX
-		BT AL, 5
-		JE enable
+		BT AX, 5
+		JNZ SerialPut
 
 		; (2) Output character to UART
 		MOV DX, THR_PORT
@@ -39,8 +35,6 @@ SerialPut:
 		OUT DX, AL
 
 		; (3) Return to caller
-		POP EBP
-
 		RET
 
 
@@ -56,8 +50,6 @@ SerialPut:
 
 SerialISR:	STI             	; Enable (higher-priority) IRQs
 
-		PUSH EBP
-		MOV EBP, ESP
 		; (1) Preserve all registers
 		PUSHA
 
@@ -65,8 +57,8 @@ SerialISR:	STI             	; Enable (higher-priority) IRQs
 		MOV DX, LSR_PORT
 		IN AL, DX
 
-		BT AL, 1
-		JE _Eoi
+		BT AX, 0
+		JZ _Eoi
 
 		; (2) Get character from UART
 		MOV DX, RBR_PORT
@@ -79,12 +71,10 @@ SerialISR:	STI             	; Enable (higher-priority) IRQs
 		PUSH data
 
 		; Param #1: address of queue
-		PUSH inbound_queue
+		PUSH DWORD [inbound_queue]
 
 		CALL	QueueInsert
 		ADD	ESP,8
-
-		POP EBP
 
 		RET
 
